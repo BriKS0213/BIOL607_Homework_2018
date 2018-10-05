@@ -1,0 +1,194 @@
+---
+title: "Homework2_Sampling"
+author: "Brianna Shaughnessy"
+date: "9/20/2018"
+output: 
+  rmarkdown::html_document:
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. R Warmup
+
+####1a. Create a vector of 100 randomly distributed numbers between 0 and 100 using runif and save the vector into the variable my_vec. If you cannot figure out runif, try ?runif. 
+
+```{r, warning=FALSE}
+my_vec <- runif(n = 100, min = 0, max = 100)
+my_vec
+str(my_vec)
+summary(my_vec)
+```
+
+####What information does str and summary tell you about my_vec? How do they differ?  
+
+**str(my_vec)** tells us that this vector is a set of numeric values. It gives us a sample of values from the vector and tells us the vector size is [1:100] meaning 1 row and 100 columns.  
+**summary(my_vec)** gives us descriptive information about the vector including is 4 quartiles, Median, and Mean.
+
+####1b.  Try out a little plot. What does hist(my_vec) show you? What information does the helpfile for hist tell you about what you just did?  
+
+```{r}
+hist(my_vec)
+```
+  
+  **hist(my_vec)** shows a histrogram of the distribution of numbers in the vector I created. In other words - the frequency of each number between 1 and 100 in our randomly chosen dataset. The helpfile for hist describes the use of the generic function hist and gives detailed explanation of the Arguments used in the function and examples of how to use it for different applications.
+  
+####1c. Load up the mtcars dataset using data(mtcars). Apply the following functions to mtcars: class, str, summary. What do these three functions tell you about mtcars?
+
+```{r}
+data("mtcars")
+class(mtcars)
+str(mtcars)
+summary(mtcars)
+```
+  **The class function** tells us that mtcars is a data frame from R  
+  **The structure** function gives us a bit more information about the mtcars dataframe, letting us know that this data frame contains 32 observations of 11 variables. It then goes on to describe the 11 variables including their name, type of variable (numeric), and providing the first few numbers of each variable.  
+  **The summary function** goes even further to provide parameters of the data frame's variables including mean and quartile ranges.
+
+#### 1d. Look at the help file for the class data.frame. What does it tell you about these objects?
+
+The help file for data.frame tells us these objects are a collection of variables that share similar properties to a matrix or list. It continues on to show how to build your own data frame using specific arcuments within the function.
+
+## 2. Sample Properties
+
+Consider the following vasopressin levels in voles.
+
+
+```{r cars}
+vole_vaso <- c(98,96,94,88,86,82,77,74,70,60,
+           59,52,50,47,40,35,29,13,6,5)
+```
+
+#### 2a. Say "Vole vasopressin" 10 times as fast as you can. How many times dide you trip up?
+
+Less than when I tried to say "Data Visualization" at the Science Cafe ;)
+
+#### 2b. What is the mean, median, sd, and interquartile range of the sample?
+
+```{r}
+    summary(vole_vaso)
+```
+
+```{r}
+    sd(vole_vaso)
+    sqrt(sum((vole_vaso-mean(vole_vaso))^2/(length(vole_vaso)-1)))
+```    
+      
+```{r}
+    IQR(vole_vaso)
+```
+**Mean**: 58.05  
+**Median**: 59.50  
+**sd**: 29.75  
+**IQR**: 44.25  
+      
+
+#### 2c. What is the standard error of the mean (do this with a formula!)?
+
+```{r}
+    stderr <- function(vole_vaso) sd(vole_vaso)/sqrt(length(vole_vaso))
+    stderr(vole_vaso)
+```
+```{r}
+    standard_error <- sd(vole_vaso) / sqrt(length(vole_vaso))
+    standard_error
+```
+
+
+#### 2d. What does the standard error of the mean tell you about our estimate of the mean values of the population of vole vassopressin?
+
+The standard error of the mean describes the precision of our mean estimations. In the case of vole vassopressin, our standard error of 6.65 indicates that we are (about 66%) confident that a true value from our sample population will fall withing 6.65(units) of our estimation. Based on our samples this is a bit of a large standard error.
+
+# 3. Sample Size for upper quartiles
+
+We can get the upper quartile value of vole vassopressin with
+
+```{r}
+    quantile(vole_vaso, probs = 0.75)
+```
+
+#### 3a. Use sample() to get just one resample with a sample size of 10. What is its upper quartile?
+
+85.25
+
+```{r}
+  set.seed(2018)
+  resample<- sample(vole_vaso, size = 10, replace = TRUE)
+  quantile(resample, probs = 0.75)
+```
+
+
+#### 3b. Build an initial data frame for simulations with the sample sizes 5 through 20. Have 100 simulations per sample size.
+
+```{r}
+set.seed(2018)
+vole_sim <- data.frame(sample_size = rep(5:20, time = 100))
+```
+
+#### 3c. Use this data frame to get simulated upper quartiles for each sample size.
+
+```{r}
+set.seed(2018)
+vole_sim_quartiles <- vole_sim %>%
+  rowwise()%>%
+  mutate(upp_qt = quantile(sample(vole_vaso, size = sample_size, replace = TRUE), probs = 0.75))%>%
+  ungroup()
+vole_sim_quartiles
+```
+
+#### 3d. With a plot make a guesstimate as to the best sample size for estimating the upper quartile of the population.
+
+Looking at our plot of simulation results - the variability in our estimate of upper quartile begins to decrease somewhere around a sample size of 15. Our simulations with a sample size of 20 exhibit the least amount of variability so - to be safe - **I would go with a sample size of 20.** 
+
+```{r}
+plot(upp_qt ~ sample_size, data = vole_sim_quartiles)
+```
+
+# 4. SE and CI
+
+#### 4a. With the upper quartile simulations, calculate the SD for each sample size using dplyr
+
+```{r} 
+set.seed(2018)
+#Take our vole_vaso upper quartile simulations
+vole_quartiles <- vole_sim_quartiles %>%
+#Group by each sample size
+  group_by(sample_size) %>%
+#calculate the SD of sample means
+  summarize(sd_of_qt = sd(upp_qt))%>%
+#turn into dataframe for use in part 4c.
+  data.frame()%>%
+  ungroup()
+vole_quartiles
+```
+
+#### 4b. What does this value, the standard error of the upper quartile, mean?
+
+This shows the standard deviation of the upper quartile sampling distribution. The higher the sample number the lower the deviation in the sampling distribution. 
+
+#### 4c. What is the CI of the upper quartile with a sample size of 10. What does this mean? 
+
+The CI of the upper quartile with a sample size of 10 is within the following range: 
+
+76.07 < true value < 89.93 . This Confidence Interval indicates that we have 95% confidence that the true value of the mean of the upp qt falls within this range. 
+
+```{r}
+#divide the sd of upper quartile when n = 10 by the sqrt of n = 10 to get the standard error
+
+std_error_n10 <- vole_quartiles[6,2]/sqrt(10)
+
+# Use the upper quartile value found in the beginning of question 3 to find the range for our 95% Confidence Interval 
+
+CI_Lower <- 83 - (2*std_error_n10)
+CI_Upper <- 83 + (2*std_error_n10)
+
+std_error_n10
+CI_Upper
+CI_Lower
+```
+

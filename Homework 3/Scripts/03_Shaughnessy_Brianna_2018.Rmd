@@ -1,0 +1,199 @@
+---
+title: "03_Shaughnessy_Brianna_2018"
+author: "Brianna Shaughnessy"
+date: "9/24/2018"
+output:
+  rmarkdown::html_document:
+  theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(forcats)
+library(dplyr)
+library(ggplot2)
+library(tweenr)
+library(gganimate)
+library(viridis)
+library(transformr)
+library(tidyr)
+library(readr)
+library(wesanderson)
+library(devtools)
+```
+
+# Homework 3: Data Visualization
+
+## 1: Problems from Whitlock and Schluter
+
+####10a. 95% Confidence Interval for the population mean
+6.86 < true mean < 9.76
+
+####10b. Provide an interpretation of the 95% Confidence Interval
+This 95% Confidence Interval indicates that we are 95% certain that the true value of the mean population falls within the calculated range between 6.9 and 7.8.
+
+```{r}
+Genes <- read.csv("GeneRegulation.csv")
+GenesCI <- Genes%>%
+  #find the average/mean of the population
+  summarize( avg_gene = mean(ngenes),
+   #find the standard deviation of the mean         
+             sd_gene = sd(ngenes),
+   #calculate the standard error
+            std_err = sd_gene/(sqrt(109)),
+  #find the 95% Confidence Interval
+            CI_lower = avg_gene - (2*std_err),
+            CI_upper = avg_gene + (2*std_err))
+GenesCI
+```
+
+####17. Is the Confidence Interval interpreted correctly? Explain.
+This is not the correct interpretation of the confidence interval because it is not a measure of probability. 
+
+####18. Corpseflowers
+**Mean:** 70.1  
+**Standard Deviation:** 48.5  
+**Standard Error:** 15.3  
+**95% Confidence Interval:** Lower: 39.4 < true mean < 100.8  
+**d.** With a larger sample size the mean would remain within the same range as this smaller sample.
+**e.** Assuming a normal districution: increasing sample size decreases standard deviation - within the equation for standard deviation we are dividing a calculated number by the sample size. Thus: dividing by a larger number will produce a smaller product but under certain circumstances there is a threshold where the sample mean (x) will approach the population mean and the two will even eachother out. 
+**f.** Increasing sample size increases precision in our sampling distribution. I would expect standard error to decrease with increasing sample size.
+
+```{r}
+getwd()
+Flowers <- read.csv("Corpseflowers.csv")
+Flower_Stats <- Flowers %>%
+  summarize(avg_flowers = mean(numberOfBeetles),
+            sd_flowers = sd(numberOfBeetles),
+            SE_flowers = sd_flowers/(sqrt(10)),
+            Upper_Quartile = avg_flowers + (2*SE_flowers),
+            Lower_Quartile = avg_flowers - (2*SE_flowers))
+Flower_Stats
+```
+
+## 2: Arctic Sea Ice 1978 - 2016
+####2.1 Load the data and make month names into factors. Are they in the right order?
+Not all months are in the correct order. This may be because it looks like the data was collected during different years.
+
+```{r}
+Sea_Ice <- read_csv("NH_Sea_Ice.csv")
+Sea_Ice_Data <-Sea_Ice %>%
+  mutate(Month_Name = factor(Month_Name)) %>%
+  mutate(Month_Name = forcats::fct_inorder(Month_Name))
+  
+levels(Sea_Ice_Data$Month_Name)
+?levels
+```
+
+####2.2 What is the order of factor levels that result?
+
+**fct_rev()**reverses the order of factor levels, so on this dataset this function outputs the factor levels from the above question but in reverse order.  
+**fct_relevel()**allows us to move levels around. With my code I moved August, February, and January to see that whatever levels are listed will appear in the order that is represented in my code.  
+**fct_recode()**allows the user to change levels by hand. For my code I replaced "Feb" with "Month"  
+
+
+```{r}
+levels(fct_rev(Sea_Ice_Data$Month_Name))
+?fct_rev
+levels(fct_relevel(Sea_Ice_Data$Month_Name, "Aug", "Feb", "Jan"))
+?fct_relevel
+levels(fct_recode(Sea_Ice_Data$Month_Name, Month = "Feb"))
+?fct_recode
+```
+
+Mutate month name to get months in the right order, from January to December. Show that it worked with levels()
+
+```{r}
+Sea_Ice_Data <- Sea_Ice_Data %>%
+  mutate(Month_Name = fct_relevel(Sea_Ice_Data$Month_Name,
+                                  "Jan", "Feb", "Mar", "Apr", "May",
+                                  "Jun", "Jul", "Aug", "Sep", "Oct",
+                                  "Nov", "Dec"))
+levels(Sea_Ice_Data$Month_Name)
+```
+
+
+####2.3 Make a column called Season that is a copy of Month Name and turn it into a factor vector with the levels Winter, Spring, Summer, Fall in that order. Use levels() on Sea_Ice_Data$Season to show that it worked.
+
+```{r}
+#Make a column called Season that is a copy of Month_Name.
+Sea_Ice_Data <- Sea_Ice_Data %>%
+  mutate(Season = fct_recode(Month_Name, Winter = "Jan", Winter =
+                               "Feb", Spring = "Mar", Spring =
+                               "Apr", Spring = "May", Summer = 
+                               "Jun", Summer = "Jul", Summer = 
+                               "Aug", Fall = "Sep", Fall =
+                               "Oct", Fall = "Nov", Winter =
+                               "Dec")) 
+                             #Give the factors levels for Season.
+#Show the levels
+levels(Sea_Ice_Data$Season)
+```
+
+####2.4 Make a boxplot showing the variability in sea ice extent every month.
+
+```{r}
+Box_Plot <- ggplot(data = Sea_Ice_Data,
+                   mapping = aes(x = Month_Name, y = Extent))+
+  geom_boxplot()
+Box_Plot
+```
+
+
+####2.4(cont) Use dplyr to get the annual minimum sea ice extent. Plot minimum ice by year, and add a trendline (either smooth spline or a straight line)
+
+```{r}
+
+#Find the annual minimum by targetting the Year column and summarizing the minimum of Extent grouped by year
+Ice_Stats <- Sea_Ice_Data %>%
+  group_by(Year) %>%
+  summarize(minimum = min(Extent))
+
+#Make the plot
+
+ggplot(Ice_Stats,
+       aes(x = Year, y = minimum)) +
+      geom_point()+
+      stat_smooth(method = lm)
+```
+
+####2.5 With the original data, plot sea ice by year, with different lines for different months. Then, use facet_wrap and cut_interval(Month, n=4) to split the plot into seasons.
+  Using n = 4 just split up months by 4 but not in order of Season - so I facet-wrapped the Season column instead.
+
+```{r}
+
+graph_by_year <- ggplot(data = Sea_Ice_Data,
+                mapping = aes(x=Year, y=Extent, 
+                              color = Month, group = Month)) +
+#add the points
+              geom_line()
+#Now facet wrap to add Seasons
+graph_by_year + facet_wrap(~Season)
+```
+
+
+####2.6) Last, make a line plot of sea ice by month with different lines as different years. Color by year, a different theme, and whatever other annotations, changes to axes, etc. 
+
+```{r}
+graph_by_month <- ggplot(data = Sea_Ice_Data,
+                         mapping = aes(x = Month_Name, y = Extent, 
+                                       group = Year, color = Year)) +
+  geom_line()+
+  scale_color_gradientn(colors = wes_palette("Zissou1"))+
+  guides(colors = "none") +
+  theme_dark()+
+  labs(x = "Month",
+       y = "Sea Ice Extent",
+       title = "Arctic Sea Ice 1978-2016")
+  
+Arctic_Ice <- graph_by_month + theme(panel.grid.major = element_blank())
+Arctic_Ice
+```
+
+```{r}
+Arctic_Ice +
+  transition_time(Year)
+Arctic_Ice +
+  transition_reveal(Year, along = Year)
+```
