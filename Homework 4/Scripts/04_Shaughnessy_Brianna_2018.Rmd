@@ -1,0 +1,131 @@
+---
+title: "Hypothesis Testing"
+author: "Brianna Shaughnessy"
+date: "10/3/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+```
+
+##1) W&S Chapter 6 Questions 15, 21, and 29
+
+####Question 15. For the following alternative hypotheses, give the appropriate null hypothesis. 
+a) Mean femur length of Pygmy Mammoths and Continental Mammoths do not differ between groups.
+b) Patients who take phentermine and topiramate lose weight at the same rate as control patients without these drugs.
+c) Patients who take phentermine and topiramate have the same proportion of babies born with cleft palates as do patients not taking the drugs.
+d) Shoppers on average buy the same amounts of candy when Christmas music is playing in the shop as when the usual type of music is playing.
+e) Male white-collared manakins dance the same amount when females are present as when females are absent. 
+
+####Question 21. Clinical Trials with different sample sizes:  
+a) As sample size increases the possibility of NOT rejecting the null hypothesis (Type II Error) becomes less likely because increased sample size also increases sensitivity of the hypothesis test. Thus, the 60-participant study has a higher probability of a Type II error.   
+b) The 100-participant study has higher power. This is because a larger sample size narrows the distribution of the test statistic.  
+c) Although larger sample sizes often make things easier/more precise, the difference in sample size does affect Type I Error. Thus, both studies have the same probability of a Type I Error. 
+d) We should use two-tailed tests to investigate our null hypothesis. Since the researchers are testing the null hypothesis that their drug has no effect on risk of cardiac arrest, we have no a-priori hypothesis regarding which direction (negative or positive) the effect would take if there is one. Therefore, we want to test if there is an effect in both directions since the drug could potentially increase OR decrease the risk of cardiac arrest.
+
+####Question 29. A team of researchers conducted 100 independent hypothesis tests using a significance level of alpha = 0.05.    
+**a)** If all null hypotheses were true, what is the probability that researcher would reject none of them?  
+There is a 0.95 probability or 95% chance.  
+**b)** If all 100 null hypotheses were true, how many of these tests on average are expected to reject the null hypothesis?  
+On average 5 tests would be expected.
+
+#3. Many SDs
+
+1. Heartrate Workflow: Mean effect of 5, looking at multiple SD values.
+
+```{r}
+# 3.1) Create the dataframe
+my_data <- data.frame(samp_size = rep(1:20, 500))
+#Create a vector of Standard Deviation values 3-10
+SD_val <- c(3:10)
+#Cross my data with SD_values to add a column
+my_data <- crossing(my_data, SD_val)
+#Add a column for each value to have keep its own unique row and add sample_mean
+my_data <- my_data %>%
+  group_by(1:n()) %>%
+  mutate(sample_mean = mean(rnorm(samp_size, 85, SD_val))) %>%
+  ungroup()
+
+#3.2) Add columns for Standard Error (se_y), z, and p
+
+my_data <- my_data %>%
+  mutate(se_y = SD_val/(sqrt(samp_size))) %>%
+  mutate(z = (sample_mean - 80)/se_y)%>%
+  mutate(p = 2* pnorm(abs(z), lower.tail = FALSE)) %>%
+  ungroup()
+
+#Plot p by sample size, using facet_wrap for different SD values
+my_plot <- ggplot(data = my_data, mapping = aes(x = samp_size,
+                                     y = p))+
+  geom_point() +
+  facet_wrap(~SD_val)+
+  theme_bw()
+my_plot
+```
+
+
+##3.3) P and Power
+Now plot power for an alpha of 0.05, but use color for different SD values. Include our threshold power of 0.8.
+
+```{r}
+my_plot_data <- my_data %>%
+  #for each sample size and Standard Deviation 
+  group_by(samp_size, SD_val) %>%
+  #calculate type 2 error rate for an alpha of 0.05
+  summarise(error_rate = sum(p > 0.05)/n()) %>%
+  ungroup() %>%
+  #calculate power
+  mutate(power = 1 - error_rate)
+
+#Plot power with threshold of 0.8
+ggplot(data = my_plot_data, mapping = aes(x = samp_size, 
+        y = power, group = SD_val, color = factor(SD_val))) + 
+        geom_line() + 
+        geom_point() + 
+        geom_hline(yintercept = 0.8, color = "red", 
+                   lty = 2) + 
+        theme_bw()
+```
+
+##3.4) Many Alphas
+####Last, use crossing again to explore changing alphas from 0.01 to 0.1. Plot power curves with different alphas as different colors, and use faceting to look at different SDs. 
+
+```{r}
+#Establish multiple alphas 
+alpha <- seq(0.01, 0.1, .01)
+my_alpha_data <- my_data %>%
+  #add to my data
+  crossing(alpha = alpha) %>%
+  group_by(samp_size, alpha, SD_val) %>%
+  #calculate type 2 error rate
+  summarise(error_rate = sum(p > alpha)/n()) %>%
+  ungroup() %>%
+  #specify power
+  mutate(power = 1 - error_rate)
+
+#plot
+ggplot(data = my_alpha_data, 
+       mapping = aes(x = samp_size, y = power, color = factor(alpha), group = alpha)) + 
+  geom_point() + 
+  geom_line() + 
+  facet_wrap (~SD_val) + 
+  geom_hline(yintercept = 0.8, color = "darkblue", 
+             lty = 2) + 
+  labs(x = "Sample Size", y = "Power", color = "alpha = ")+
+  theme_bw()
+
+```
+
+####3.5) What does it all mean? What do you learn about how alpha and SD affect power?
+Throughout this homework we demonstrated:
+1. As sample size and effect size increase, the power of our simulation also increases. 
+2. For our significance level (alpha), a small alpha value produces a larger power, which is also affected by sample size.
+3. Standard Deviation depends on variation in our sample population. Much larger sample sizes can remedy a noisy or variable sample population, giving us stronger statistical power. 
+4. In order to have the strongest power for analysing our data it is best to have a small alpha and small SD for our population.
+
+####3.6) How do you think that changing the effect size would affect power?
+Changing the effect size also changes the power of our statsitical test. However, it is important to note that if effect sized is increased too much we risk Type I Error. It is important to make sure effect size reflects the realities of your population. With very high effect sizes it is easier to detect a powerful interaction at small sample sizes. 
