@@ -1,0 +1,273 @@
+---
+title: "T-Test and ChiSq Homework"
+author: "Brianna Shaughnessy"
+date: "10/9/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(broom)
+library(beyonce)
+```
+
+#1. W&S ChiSq Questions
+
+##Chapter 8
+####12a. Calculate the fraction of b alleles in the population (remember, each bear has two copies of the gene)
+
+Out of 87 bears sampled in this population there are 87 X 2 possible alleles (174) alleles. Looking at my frequency table there are 21 bears with the bb genotype, 24 with Bb, and 42 with BB. This sums to 66 (b) alleles in this sample population. **The fraction of b alleles in this population is 66/174 or ~38%.
+
+####12b. With your estimate of the fraction of b alleles, and assuming a binomial distribution, calculate the expected frequency of bears with 0, 1, and 2 copies.
+
+Expected frequency of 0: 33.5  
+Expected frequency of 1: 41.0  
+Expected frequency of 2: 12.5  
+
+####12c.Compare the observed and expected frequencies in a graph. Describe how they differ.
+
+The observed frequency of bears with 0 or 2 b alleles is greater than our expected frequency while the observed frequency of bears with 1b alleles is smaller than our expected frequency.
+
+```{r}
+
+Bear <- read_csv("../Data/SpiritBearGenetics.csv")
+#Calculate the fraction of b alleles in the population 
+#Make a Table and Order the Categories
+
+#Account for each bear having 2 genes and some having Bb
+b_fraction <- (21*2+24)/(87*2)
+b_fraction
+
+#Next calculate expected frequency of bears with 0, 1, and 2 copies: bb = 2, Bb = 1, BB = 0
+
+my_frequency <- dbinom(0:2, size = 2, prob = b_fraction)
+expected <- 87*my_frequency
+observed <- c(42,24,21)
+#Compare the observed and expected frequencies in a graph
+table = rbind(observed, expected)
+colnames(table) = c("BB", "Bb", "bb")
+barplot(table, beside = TRUE, legend.text = c("observed", "expected"))
+```
+
+
+#### 24)a. Graph the relative frequency distribution for these results. What type of graph is ideal?
+A discrete graph like a bar graph is ideal because this is not continuous data. 
+
+```{r}
+Dodder <- read_csv("../Data/DodderGrowth.csv")
+Dodder <- Dodder %>%
+  group_by(directionOfGrowth) %>%
+  tally() %>%
+  mutate(relative_frequency = n/30)
+
+Dodder_Graph <- ggplot(data = Dodder, mapping = aes(x = directionOfGrowth, y = relative_frequency)) +
+  geom_col()+
+  labs(x = "Direction of Growth", y = "Relative Frequency")
+```
+
+####24b. What are the relative frequencies expected if the parasite is unable to detect the plant volatiles or any other cues present? Add these expected relative frequencies to your graph in part (a)
+
+The red line indicates expected relative frequencies. This is essentially the null Hypothesis. Since there are 4 groups it would be expected that each would account for 1/4 of observations (0.25)
+
+```{r}
+#Add a column to the data that has expected frequency
+Expected <- Dodder %>%
+  mutate(expected_frequency = (30/4))
+
+#Each should be 0.25, so plot everything together
+Dodder_Graph +
+  geom_hline(yintercept = 0.25, color = "darkred")
+```
+
+####24c. Using these data, calculate the fraction of seedlings that grow toward the volatiles. What does this fraction estimate?
+
+The fraction of seedlings that grow toward the volatiles is 17/30 = 0.57. This fraction tells us, within this sample pool, how likely the individuals were to grow towards a volatile. 
+
+####24d. Provide a standard error for your estimate. What does this standard error represent?
+
+Standard Error = 0.090 representing 
+
+```{r}
+#The standard error of proportions is equal to:
+# sqrt[p(1-p)/n]
+
+Dodder_SE <- sqrt((0.57*(1-0.57))/30)
+
+```
+
+####24e. Calculate the range of most-plausible values for the fraction of dodder seedlings that grow toward the volatiles under these experimental conditions. Does it include or exclude the fraction expected if the parasite is unable to detect plant volatiles or other cues present?
+
+##Chapter 9
+####16a.Calculate expected frequencies for a contingency test.
+
+```{r}
+Prairie <- read_csv("../Data/PrairieDogMating.csv")
+
+#Expected frequency is: 
+#row total times a column total divided by the grand total
+
+Prairie_Table <- table(Prairie)
+One_B <- (87*249)/263
+Two_B <- (93*249)/263
+Three_B <- (61*249)/263
+Four_B <- (17*249)/263
+Five_B <- (5*249)/263
+One_No_B <- (87*14)/263
+Two_No_B <-(93*14)/263
+Three_No_B <-(61*14)/263
+Four_No_B <- (17*14)/263
+Five_No_B <- (5*14)/263
+
+
+One_B
+Two_B
+Three_B
+Four_B
+Five_B
+One_No_B
+Two_No_B
+Three_No_B
+Four_No_B
+Five_No_B
+```
+
+####16b. Examine the expected frequencies. Do they meet the assumptions of a ChiSq contingency test? If not, what steps could you take to meet the assumptions and make a test?
+
+No, our data does not meet the assumptions of a ChiSq contingency test. Many of our frequencies are less than one. We could meet the assumptions by adding 1 to all of our data points, combining groups to get higher values, or doing a permutation test (or other statistic test) instead.
+
+####16c. An appropriate test shows that the number of mates of the female prairie dogs is associated with giving birth. Does this mean that the mating with more males increases the probability of giving birth? Can you think of an alternative explanation?
+
+Correlation does not necessarily mean causation. There may be some other factor acting on both. For example, maybe the hormones associated with multiple mates influences birth but this was not tested. 
+
+##Question 27
+
+The p value is below the significance level of alpha = 0.05. Therefore, we reject the null hypothesis. The probability of deterioration in health is influenced by whether a wife is widowed or not. **This question is sad and I don't like it.**
+
+```{r}
+Widows <- read.csv("../Data/WidowHealth.csv")
+
+summary(Widows)
+
+WidowTable = table(Widows$health_deterioration, Widows$widowed)
+addmargins(WidowTable)
+
+chisq.test(Widows$health_deterioration, Widows$widowed, correct = FALSE)
+```
+
+#T-Test Questions
+
+##Chapter 11 
+####21a. Draw a graph of the data, following recommended principles of good graph design. What trend is suggested?
+
+```{r}
+Soil <- read_csv("../Data/SoilLead.csv")
+ggplot(data = Soil, mapping = aes(x = Site, 
+        y = Change)) +
+geom_col()
+```
+
+####21b. Determine the most-plausible range of values for the mean change in soil lead. Describe in words what the nature of that change is. Is an increase in soil lead consistent with the data? Is a decrease in soil lead consistent?
+
+
+
+####21c. Test whether mean soil lead changed after the hurricanes. 
+
+##Chapter 12 
+####Question 20
+
+####Question 26 Do dominant and subordinate individuals differ in the means of giggle spectral CV?
+
+We reject the null hypothesis because p is low: 0.02. We are able to conclude that subordinate individuals differ in means of giggle spectral CV.
+
+```{r}
+Giggles <- read_csv("../Data/HyenaGiggles.csv")
+#t.test to see if groups differ
+head(Giggles)
+library(broom)
+Test <- t.test(Giggles$dominantIndividualGiggleVariation, y = Giggles$subordinateIndividualGiggleVariation,
+               data = Giggles,
+               paired = TRUE)
+
+Test
+```
+
+####Question 30
+
+Using a two-sample t-test looks at the difference between groups. This is not what the researchers meant to look for. 
+
+#3 Power and T
+####3.1 Data Generating Process
+Write a function that takes two means, two standard deviations, and two sample sizes as arguments. Have it return a data frame or tibble based on the inputs ready to go for a t-test
+
+```{r}
+make_t_data <- function(mean1, mean2, s1, s2, n1, n2, equal.variance = FALSE) {
+  #make a data frame, repeating treatments n number of times
+  #Use rnorm for each of the values
+data.frame(treatment = c(rep("A", n1), rep("B", n2)),
+             value = rnorm(n1+n2,
+             mean = c(rep(mean1, n1), rep(mean2, n2)), sd = c(rep(s1, n1), rep(s2, n2))))
+}
+#test if it works by applying the function to return a data frame based on the inputs.
+
+my_data <- make_t_data(mean1 = 5, mean2 = 8, s1 = 1, s2 = 2, n1 = 10, n2 = 15)
+```
+
+###3.2 P from T
+Write a function that takes a data frame and runs a two-tailed t-test with the variances assumed to be unequal. Show it works by comparing its p-value to that returned by t-test for the same simulated data set. +2 Extra Credit, look at ?ifelse or ?"if" and use one of them to have your function chose to use unequal variances if your variances differ by 20%
+
+
+```{r}
+get_p <- function(sim_data) {
+  test <- t.test(value ~ treatment, 
+                 data = sim_data)
+  test$p.value
+}
+
+get_p(make_t_data(mean1 = 5, mean2 = 8, s1 = 1, s2 = 2, 
+                  n1 = 10, n2 =  15))
+```
+
+####3.3 So Many Ps!
+
+```{r}
+replicate(20,
+          get_p(make_t_data(mean1 = 5, mean2 = 8, s1 = 1,
+                           s2 = 2, n1 = 10, n2 = 15 )))
+```
+
+####3.4 Power
+
+```{r}
+get_power <- function(mean1, mean2, s1, s2, n1, n2, nsims = 100, alpha = 0.05) {
+  p <- replicate(nsims, 
+                 get_p(make_t_data(mean1, mean2, s1, s2, n1, n2)))
+  num_wrong <- sum(p>alpha)
+  1 - num_wrong/nsims
+}
+
+```
+
+####3.5 Show it works
+
+```{r}
+pow_frame <- 
+  crossing(diff_m = 1:4, diff_s = 1:4, n1 = 10, n2 = 15) %>%
+  rowwise() %>%
+  mutate(power = get_power(mean1 = 0, mean2 = diff_m, s1 = 0, s2 = diff_s, n1 = n1, n2 = n2, nsims = 100, alpha = 0.05)) %>%
+  ungroup()
+
+ggplot(pow_frame,
+       mapping = aes(x = diff_m, 
+                     y = power, 
+                     color = factor(diff_s))) +
+  labs(x = "Mean Difference", y = "Power")+
+  geom_point()+
+  geom_line()
+
+```
+
+#add var.equal = TRUE to function in 3.2
