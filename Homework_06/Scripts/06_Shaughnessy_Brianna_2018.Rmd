@@ -1,0 +1,285 @@
+---
+title: "Correlation and Regression Homework"
+author: "Brianna Shaughnessy"
+date: "10/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(tidyverse)
+```
+#1. Correlation - W&S Chapter 16
+
+##Question 15
+####15a. Display the association between the two variables in a scatter plot.
+```{r}
+Language <- read_csv("../Data/GreyMatter.csv")
+#Explanatory Variable = Grey Matter
+#Response variable = Proficiency
+Language_Scatter <- ggplot(Language, mapping = aes(x = greymatter,
+                                                   y = proficiency))+
+  geom_point()
+Language_Scatter
+```
+
+####15b. Calculate the correlation between second language proficiency and gray-matter density. 
+```{r}
+Language_Mod <- lm(greymatter ~ proficiency, data = Language)
+language_cor <- cor.test(Language$greymatter, Language$proficiency)
+#Single out the value of the estimated correlation:
+language_correlation <- language_cor$estimate
+language_correlation
+```
+
+####15c. Test the null hypothesis of zero correlation.
+Our t-statistic is 6.36 with 20 degrees of freedom with a very small p-value (3.264 e-06), allowing us to reject the null hypothesis of zero correlation.
+```{r}
+#T-Test of zero correlation: included in the output of cor.test
+cor.test(Language$greymatter, Language$proficiency)
+```
+
+####15d. What are your assumptions in part (c)?
+**1)** Observations are from a random sample  
+**2)** Each observation is independent  
+**3)** X and Y are from a Normal Distribution  
+**4)** The relationship is linear
+
+####15e. Does the scatter plot support these assumptions? Explain.
+Our initial scatter plot does not support our assumptions. There are two outliers that can be seen. If we fit a model and look at the residuals and qq plot they also do not quite meet the assumptions of normality.
+
+```{r}
+plot(Language_Mod, which = 1)
+plot(Language_Mod, which = 2)
+```
+
+##Question 19
+####19a. Calculate the correlation coefficient between the taurocholate unbound fraction and the concentration.  
+-0.856
+```{r}
+Liver <- read_csv("../Data/LiverPreparation.csv")
+liver_cor <- cor.test(Liver$concentration, Liver$unboundFraction)
+#Single out the value of the estimated correlation:
+liver_cor_value <- liver_cor$estimate
+liver_cor_value
+```
+
+####19b.Plot the relationship between the two variables in a graph.
+
+```{r}
+liver_base <- ggplot(data = Liver, mapping = aes(x = concentration,
+                            y = unboundFraction)) +
+  geom_point() + theme_bw()
+liver_base + 
+  stat_smooth(method = "lm")
+```
+
+####19c. Examine the plot in part (b). The relationship appears to be maximally strong, yet the correlation coefficient you calculated in part (a) is not near the maximum possible value. Why not?
+This relationship may not be linear. If we look at the fitted line vs. our scattered values we see a bit of a horizontal asymptote in the scatter values. 
+
+####19d. What steps would you take with these data to meet the assumptions of correlation analysis?
+A log-transformation of X would be appropriate here.
+
+#2. Correlation SE
+Consider the following dataset:
+```{r}
+cat_happiness <- data_frame(cats = c(-0.30, 0.42, 0.85, -0.45, 0.22,-0.12, 1.46, -0.79, 0.40, -0.07),
+        happiness_score = c(-0.57, -0.10, -0.04,-0.29, 0.42, -0.92, 0.99, -0.62, 1.14, 0.33))
+cat_happiness
+```
+
+####2a. Are these two variables correlated? What is the output of <code> cor() </code> here? What does a test show you?
+The two variables do seem correlated based on our estimated correlation and (somewhat) low p-value.  Output of <code>cor()</code> is our estimated correlation of 0.676  
+The output of a test <code>cor.test()</code> gives us more information including our T-statistic of 2.59 with 8 degrees of freedom, our p-value of 0.032, and our 95% Confidence interval. 
+
+```{r}
+cor(cat_happiness$cats, cat_happiness$happiness_score)
+cor.test(cat_happiness$cats, cat_happiness$happiness_score)
+```
+
+####2b. What is the SE of the correlation based on the info from <code>cor.test()</code>?
+Our Standard Error is the standard deviation of the sampling distribution of r. A rough calculation based on the info from our cor.test is 0.41
+
+```{r}
+(0.91578829-0.08050709)/2
+```
+
+####2c. Now, what is the SE via simulation? To do this, you'll need to use <code>cor()</code> and get the relevant parameter from the output (remember - you get a matrix back, so, what's the right index!), <code>replicate()</code>, and <code>sample()</code> or <code>dplyr::sample_n()</code> with <code>replace = TRUE</code> to get, let's say, 1000 correlations. How does this compare to your value above?
+
+A bit larger but similar
+```{r}
+simulation_SE <- replicate(1000, cor(sample_n(cat_happiness, nrow(cat_happiness), replace = TRUE)) [1,2])
+
+mean(simulation_SE)
+```
+
+#3. W&S Chapter 17
+
+##Question 19
+
+####19a. Draw a scatter plot of these data. Which variable should be the explanatory variable (X), and which should be the response variable (Y)?
+**Explanatory Variable (X)** Nutrients  
+**Response Variable (Y)** Species
+
+```{r}
+PlantSpecies <- read_csv("../Data/PlantSpecies.csv")
+plant_scatter <- ggplot(data = PlantSpecies,
+                        mapping = aes(x = `nutrients`,
+                                      y = `species`)) +
+  geom_point() + theme_bw()
+plant_scatter
+```
+
+####19b. What is the rate of change in the number of plant species supported per nutrient type added? Provide a standard error for your estimate.
+The rate of change for number of plant species supported per nutrient type added is -16.71. This indicates that each nutrient added decreases number of plants supported by -16.71.
+
+```{r}
+# Fit the Model
+plant_lm <- lm(nutrients ~ species, data = PlantSpecies)
+plant_lm
+# Fit Assumptions of the Model
+plot(plant_lm, which = 1)
+plot(plant_lm, which = 2)
+#3. Evaluate the Model Itself
+summary(plant_lm)
+#Pull rate from t-value?
+```
+
+####19c. Add the least-squares regression line to your scatter plot. What fraction of the variation in the number of plant species is "explained" by the number of nutrients added?
+Our R-squared value is 0.536, equal to the fraction of variation in the number of plant species that is "explained" by the number of nutrients added.
+
+```{r}
+#Add regression line
+plant_scatter +
+  stat_smooth(method = lm, formula = y~x)
+```
+
+####19d. Test the null hypothesis of no treatment effect on the number of plant species.
+Our p-value is less than 0.05 (0.01607) allowing us to reject our null hypothesis of no treatment effect on the number of plant species.
+
+```{r}
+#F-Test of the model
+anova(plant_lm)
+```
+
+##Question 30
+
+####30a. What is the approximate slope of the regression line?
+-16.71
+
+```{r}
+Teeth <- read_csv("../Data/NuclearTeeth.csv")
+
+teeth_lm <- lm(deltaC14 ~ dateOfBirth, data = Teeth)
+teeth_lm
+```
+
+####30b. Which pair of lines shows the confidence bands? What do these confidence bands tell us?
+The inner dashed lines show the confidence bands. The confidence bands visualize the 95% Confidence Interval for the prediced mean Date of Birth at a given delta C14.
+
+####30c. Which pair of lines shows the prediction interval? What does this prediction interval tell us?
+The outer dashed lines show the prediction interval. The prediction interval visualizes the uncertainty when predicting the Date of Birth of a single individual. 
+
+##Question 31
+####31a. Calculate a regression line that best describes the relationship between year of painting and the portion size. What is the trend? How rapidly has portion size changed in paintings?
+There is a trend of increasing portion size since the year 1000. The slope of this regression is 82.64, indicating that portion size has changed at a rate of 82.64 units per unit year of change. 
+```{r}
+PortionSize <- read_csv("../Data/LastSupper.csv")
+
+portion_lm <- lm(year ~ portionSize, data = PortionSize)
+portion_lm
+portion_base <- ggplot(data = PortionSize, mapping = aes(x = `year`, 
+                                                y = `portionSize`)) +
+  geom_point()
+
+portion_regression <- portion_base +
+  stat_smooth(method = "lm")
+portion_regression
+```
+
+####31b. What is the most-plausible range of values for the slope of this relationship? Calculate a 95% Confidence Interval.
+The 95% Confidence Interval for the slope is the estimated coefficient (82.64) plus or minus two standard errors (24.09). The most-plausible range is 34.46< to >130.82 
+```{r}
+summary(portion_lm)
+CI_upper <- 82.64 + (24.09*2)
+CI_lower <- 82.64 - (24.09*2)
+```
+
+####31c. Test for a change in relative portion size painted in these works of art with the year in which they were painted. 
+
+```{r}
+anova(portion_lm)
+```
+
+####31d. Draw a residual plot of these data and examine it carefully. Can you see any cause for concern about using a linear regression? Suggest an approach that could be tried to address the problem.
+Our residuals are scewed and do not meet the assumptions of a linear regression. Transformations of X and Y could be used to render this nonlinear relationship linear. A log-transformation may be appropriate here.
+
+```{r}
+hist(residuals(portion_lm))
+```
+
+#4. Intervals and Simulation 
+Fit the deet and bites model from lab
+```{r}
+deet <- read_csv("../Data/DEET.csv")
+
+deet_fit <- ggplot(deet, aes(dose, bites)) +
+  geom_point() +
+  stat_smooth(method = lm)
+deet_fit
+```
+
+Now, look at <code>vcov()</code> applied to your fit. For example:
+```{r}
+deet_mod <- lm(bites~dose, data = deet)
+vcov(deet_mod)
+```
+What you have here is the variance-covariance matrix of the parameters of the model. In essence, larger slopes in this case will have smaller intercepts, and vice-verse. This maintains the best fit possible, despite deviations in the slope and intercept. BUT - what’s cool about this is that it also allows us to produce simulations (posterior simulations for anyone interested) of the fit. We can use a package like  mnormt that let’s us draw from a multivariate normal distribution when provided with a vcov matrix. For example…
+
+```{r}
+library(mnormt)
+ rmnorm(4, mean = coef(deet_mod), varcov = vcov(deet_mod))
+```
+
+####4a. Fit Simulations
+Using <code>geom_abline()</code> make a plot that has the following layers and shows that these simulated lines match up well with the fit CI. 1) the data, 2) the lm fit with a CI, and 3) simulated lines. You might have to mess around to make it look as good as possible.
+```{r}
+library(mnormt)
+# create simulations
+simulation <- rmnorm(60, mean = coef(deet_mod), varcov = vcov(deet_mod)) %>%
+  as.data.frame
+# Create ggplot
+ggplot(data = deet, mapping = aes(dose, bites)) +
+  geom_point() +
+# add simulated lines using abline
+  geom_abline(data = simulation, aes(slope = dose, intercept = `(Intercept)`, alpha = 0.05)) +
+#looks better if I add lm fit with CI after the ablines are added.
+  stat_smooth(data = deet, method = lm, color = "red", fill = "darkred")
+```
+
+####4b. Prediction Simulations
+That’s all well and good, but what about the prediction intervals? To each line, we can add some error drawn from the residual standard deviation. That residual can either be extracted from <code>summary()</code> or you can get the sd of residuals.
+```{r}
+simulation <- simulation %>%
+  mutate(error = rnorm(n(), 0, sd(deet_mod$residuals)))
+```
+
+Now, visualize the simulated prediction interval around the fit versus the calculated prediction interval around the fit via predict. +1 extra credit for a clever visualization of all elements on one figure - however you would like
+```{r}
+prediction_data <- predict(deet_mod, interval = "prediction")%>%
+  cbind(deet)
+
+ggplot(data = deet, mapping = aes(dose, bites)) +
+#plot our data points
+  geom_point() +
+#plot our simulated values  
+  geom_abline(data = simulation, aes(slope = dose, intercept = error+`(Intercept)`), alpha = 0.5, color = "darkred") +
+#Plot our predicted values  
+  geom_ribbon(data = prediction_data, aes(ymin = lwr, ymax = upr), fill = "orange", alpha = 0.5) +
+  geom_abline(data = simulation, aes(slope = dose, intercept = `(Intercept)`), alpha = 0.5) +
+  stat_smooth(data = deet, method = lm, color = "purple4", fill = "red")
+```
