@@ -1,0 +1,136 @@
+---
+title: "Likelihood"
+author: "Brianna Shaughnessy"
+date: "10/20/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(viridis)
+library(profileModel)
+```
+
+**1. Grid Sampling**   
+Based on Friday’s lab, load up the pufferfish data and use grid sampling to find the MLE of the slope, intercept and residual SD of this model. Feel free to eyeball results from an lm() fit to get reasonable values. Try not to do this for a grid of more than ~100K points (more if you want!). It’s ok to be coarse. Compare to lm.
+Compared to lm our grid sampling values are pretty much the same or at least very close.
+
+```{r}
+Puffer <- read_csv("../Data/Pufferfish.csv")
+#Calculate parameters and eyeball for reasonable simulation values
+puffer_lm <- lm(predators ~ resemblance, data = Puffer)
+summary(puffer_lm)
+#create function
+likelihood_fun <- function(slope, intercept, residual_sd){
+  #generate data
+  predators_fit <- intercept + slope * Puffer$resemblance
+  #generate likelihood
+  sum(dnorm(Puffer$predators, predators_fit, residual_sd, log = TRUE))
+}
+
+#Put that function to use:
+
+grid_sampling <- crossing(intercept = seq(0.5, 2.5, .05),
+                          slope = seq(2, 3.5, .05),
+                          residual_sd = seq(2.9, 3.1, .01)) %>%
+  rowwise() %>%
+  mutate(logLikelihood = likelihood_fun(slope, intercept, residual_sd)) %>%
+  ungroup()
+#Find the MLE:
+MLE <- grid_sampling %>%
+  filter(logLikelihood == max(logLikelihood))
+MLE
+#Compare to:
+puffer_lm
+```
+
+**2. Surfaces**  
+Filter the dataset to the MLE of the SD. Plot the surface for the slope and intercept in whatever way you find most compelling. You might want to play around with zooming in to different regions, etc. Have fun!
+Note to self: The bright patch is where everything converges for most likely value.
+
+```{r}
+ggplot(grid_sampling %>% 
+         filter(residual_sd == 2.9) %>%
+         filter(logLikelihood > max(logLikelihood) - 4),
+       ##not sure why this is -4
+       aes(x = intercept, y = slope, fill = exp(logLikelihood))) +
+  geom_raster() +
+  scale_fill_viridis(option = "B")
+```
+
+**3. GLM**  
+Now, compare those results to results from glm. Show the profiles and confidence intervals from glm() for the slope and intercept.
+Again - essentially the same numbers. Showing the many ways that we can get to the same model of our parameters.
+
+```{r}
+Puffer_GLM <- glm(predators ~ resemblance , data = Puffer,
+                  family = gaussian(link = "identity"))
+Profile <- profileModel(Puffer_GLM,
+                        objective = "ordinaryDeviance",
+                        quantile = qchisq(0.95, 1))
+
+#Check the plots - they look okay
+plot(Profile)
+confint(Puffer_GLM)
+```
+
+**4. Get Outside of GLM**  
+Load up 'bbmle and try out mle2. It’s a bit different, in that the first argument is a function that minimizes the log likelihood (not maximizes). The second argument is a list of start values - e.g. list(slope = 2, intercept = 5, resid_sd = 2). Try and fit your model with mle2 using start values close to the actual estimates. Look at the summary and plot the profile. Note, you might get a lot of errors because it will try impossible values of your residual SD. Also, note that you’ll have to rewrite your likelihood function to return the negative log likelihood (or write a wrapper that does so). A small thing
+
+```{r}
+#Load up bbmle
+library(bbmle)
+#Create the function a new way
+
+minimum_likelihood <- function(slope, intercept, residual_SD) -1*likelihood_fun(slope, intercept, residual_SD)
+
+Puffer_2MLE <- mle2(minimum_likelihood,
+                    start = list(slope = 2, intercept = 5, 
+                                 residual_SD = 3))
+summary(Puffer_2MLE)
+plot(profile(Puffer_2MLE))
+```
+
+**5. Start values**  
+What happens if you start with start values very far away from the initial values. Failing here is fine. But what do you think is happening, and what does this say about the value of start values?  
+Trying strange values spits back: "Convergence falure: iteration limit reached". This shows how chosen values can alter your model, which is why it is important to eyeball proper values or try a few to git the best model.
+
+```{r}
+#mle2(minimum_likelihood,
+     #start = list(slope = 100, intercept = 150, residual_SD = 10))
+
+```
+
+**6. Algorithms**  
+By default, mle2 uses the Nelder-Mead algorithm via the optim function. What happens if you add an method argument to “SANN” or “L-BFGS-B” (and for the later, which is bounded sampling, give it a lower argument for your residual value, so it’s always positive). See ?optim for some more guidance. Do these both converge to the same value? Based on their profiles, do you trust them? (Note, Simulated annealing takes a looooong time. Go have a cuppa while the profile for that one runs).
+
+Based on the profiles and the fact they our values are converging around the same area and a similar area to that of our other tests did -- I would say that I trust them.
+
+```{r}
+
+#Adding "SANN"
+Puffer_SANN <- mle2(minimum_likelihood,
+                    start = list(slope = 1.9, intercept = 1, 
+                                 residual_SD = 3),
+                                   method = "SANN")
+summary(Puffer_SANN)
+#Plot it
+plot(profile(Puffer_SANN))
+
+#Adding "L-BFGS-B"
+
+Puffer_LB <- mle2(minimum_likelihood,
+                  start = list(slope = 1.9, intercept = 1, 
+                               residual_SD = 3),
+                  method = "L-BFGS-B")
+
+plot(profile(Puffer_LB))
+summary(Puffer_LB)
+```
+
+
